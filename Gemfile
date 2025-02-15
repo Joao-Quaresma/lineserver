@@ -15,6 +15,7 @@ gem "solid_cable"
 gem "bootsnap", require: false
 gem "kamal", require: false
 gem "thruster", require: false
+gem "oj_serializers"
 
 group :development, :test do
   gem "rspec-rails"  # RSpec for testing
