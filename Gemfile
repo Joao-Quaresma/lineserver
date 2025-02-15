@@ -19,12 +19,17 @@ gem "oj_serializers"
 gem "redis", "~> 5.3"
 
 group :development, :test do
-  gem "rspec-rails"  # RSpec for testing
+  gem "rspec-rails" # RSpec for testing
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"
   gem "brakeman", require: false
   gem "rubocop-rails-omakase", require: false
+  gem "factory_bot_rails", "~> 6.4"
 end
 
 group :development do
   gem "web-console"
+end
+
+group :test do
+  gem "shoulda-matchers", "~> 6.4"
 end

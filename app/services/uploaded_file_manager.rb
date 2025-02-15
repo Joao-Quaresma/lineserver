@@ -1,42 +1,20 @@
 class UploadedFileManager
-  STORAGE_PATH = Rails.root.join("storage", "uploads")
-
   def self.create_uploaded_file(uploaded_file)
     return { error: "No file uploaded" } unless uploaded_file
-
-    file_extension = File.extname(uploaded_file.original_filename)
-    temp_filename = SecureRandom.uuid + file_extension
-    temp_file_path = STORAGE_PATH.join(temp_filename)
-
-    File.open(temp_file_path, "wb") { |file| file.write(uploaded_file.read) }
-
-    line_count = 0
-    offset = 0
-
-    File.open(temp_file_path, "r") do |file|
-      file.each_line do |line|
-        line_count += 1
-        offset += line.bytesize
-      end
-    end
 
     file_record = UploadedFile.create!(
       name: uploaded_file.original_filename,
       size: uploaded_file.size,
-      line_count: line_count
+      line_count: 0
     )
 
-    unique_filename = "#{file_record.id}#{file_extension}"
-    final_file_path = STORAGE_PATH.join(unique_filename)
-    File.rename(temp_file_path, final_file_path)
+    file_path = FileStorageService.save_file(uploaded_file, file_record.id)
 
-    offset = 0
-    File.open(final_file_path, "r") do |file|
-      file.each_line.with_index(1) do |line, line_number|
-        RedisCache.hset("file:#{file_record.id}", line_number, offset)
-        offset += line.bytesize
-      end
-    end
+    file_data = FileStorageService.count_lines_and_offsets(file_path)
+
+    file_record.update!(line_count: file_data[:line_count])
+
+    file_data[:offsets].each { |line_number, offset| RedisCache.hset("file:#{file_record.id}", line_number, offset) }
 
     RedisCache.delete("files:list")
 
@@ -48,71 +26,58 @@ class UploadedFileManager
     }
   end
 
+
   def self.fetch_file_list
     cached_files = RedisCache.get("files:list")
-
-    if cached_files
-      puts "DEBUG: Fetching file list from Redis"
-      return Oj.load(cached_files)
-    end
+    return Oj.load(cached_files) if cached_files
 
     files = UploadedFile.order(created_at: :desc)
     serialized_files = UploadedFileSerializer.many(files)
 
     RedisCache.set("files:list", Oj.dump(serialized_files), 300)
-
-    puts "DEBUG: Fetching file list from DB and caching it"
     serialized_files
   end
 
-
   def self.fetch_line_from_file(file_id, line_number)
     file = UploadedFile.find_by(id: file_id)
-    return { error: "File not found" } unless file
-    return { error: "Invalid line number" } if line_number <= 0
+    return { error: "File not found" }, :not_found unless file
+    return { error: "Invalid line number" }, :bad_request if line_number <= 0
 
-    file_extension = File.extname(file.name)
-    unique_filename = "#{file.id}#{file_extension}"
-    file_path = STORAGE_PATH.join(unique_filename)
-
-    return { error: "File not found on disk" } unless File.exist?(file_path)
+    return { error: "File not found on disk" }, :not_found unless FileStorageService.file_exists?(file_id)
 
     offset = RedisCache.hget("file:#{file.id}", line_number)
-    return { error: "Line number out of range" } unless offset
+    return { error: "Requested line exceeds file length" }, :payload_too_large unless offset
 
     cache_key = "line:#{file.id}:#{line_number}"
     cached_line = RedisCache.get(cache_key)
 
     if cached_line
-      puts "DEBUG: Fetching line from Redis cache"
       selected_line = cached_line
     else
-      File.open(file_path, "r") do |file|
-        file.seek(offset.to_i)
-        selected_line = file.readline.strip
-      end
+      file_path = FileStorageService.get_file_path(file_id)
+      selected_line = FileStorageService.read_line(file_path, offset)
 
       RedisCache.set(cache_key, selected_line, 300)
-      puts "DEBUG: Caching line in Redis"
     end
 
-    UploadedFileSerializer.one(file).merge(line: selected_line)
+    [ { id: file.id, line: selected_line }, :ok ]
   end
+
 
   def self.delete_uploaded_file(file_id)
     file = UploadedFile.find_by(id: file_id)
-    return { error: "File not found" } unless file
+    return [ { error: "File not found" }, :not_found ] unless file
 
-    file_extension = File.extname(file.name)
-    unique_filename = "#{file.id}#{file_extension}"
-    file_path = STORAGE_PATH.join(unique_filename)
+    if FileStorageService.file_exists?(file.id)
+      FileStorageService.delete_file(file.id)
+      RedisCache.hdel("file:#{file.id}")
+    else
+      return [ { error: "File already deleted" }, :gone ]
+    end
 
-    File.delete(file_path) if File.exist?(file_path)
-
-    RedisCache.hdel("file:#{file.id}")
     RedisCache.delete("files:list")
-
     file.destroy!
-    { message: "File deleted successfully" }
+
+    [ { message: "File deleted successfully" }, :ok ]
   end
 end
