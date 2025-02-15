@@ -4,17 +4,18 @@ class UploadedFileManager
   def self.create_uploaded_file(uploaded_file)
     return { error: "No file uploaded" } unless uploaded_file
 
-    file_path = STORAGE_PATH.join(uploaded_file.original_filename)
+    file_extension = File.extname(uploaded_file.original_filename)
+    temp_filename = SecureRandom.uuid + file_extension
+    temp_file_path = STORAGE_PATH.join(temp_filename)
 
-    File.open(file_path, "wb") { |file| file.write(uploaded_file.read) }
+    File.open(temp_file_path, "wb") { |file| file.write(uploaded_file.read) }
 
     line_count = 0
     offset = 0
 
-    File.open(file_path, "r") do |file|
+    File.open(temp_file_path, "r") do |file|
       file.each_line do |line|
         line_count += 1
-        RedisCache.hset("file:#{uploaded_file.original_filename}", line_count, offset)
         offset += line.bytesize
       end
     end
@@ -25,9 +26,26 @@ class UploadedFileManager
       line_count: line_count
     )
 
+    unique_filename = "#{file_record.id}#{file_extension}"
+    final_file_path = STORAGE_PATH.join(unique_filename)
+    File.rename(temp_file_path, final_file_path)
+
+    offset = 0
+    File.open(final_file_path, "r") do |file|
+      file.each_line.with_index(1) do |line, line_number|
+        RedisCache.hset("file:#{file_record.id}", line_number, offset)
+        offset += line.bytesize
+      end
+    end
+
     RedisCache.delete("files:list")
 
-    { id: file_record.id, name: file_record.name, size: file_record.size, line_count: line_count }
+    {
+      id: file_record.id,
+      name: file_record.name,
+      size: file_record.size,
+      line_count: file_record.line_count
+    }
   end
 
   def self.fetch_file_list
@@ -53,13 +71,16 @@ class UploadedFileManager
     return { error: "File not found" } unless file
     return { error: "Invalid line number" } if line_number <= 0
 
-    file_path = STORAGE_PATH.join(file.name)
+    file_extension = File.extname(file.name)
+    unique_filename = "#{file.id}#{file_extension}"
+    file_path = STORAGE_PATH.join(unique_filename)
+
     return { error: "File not found on disk" } unless File.exist?(file_path)
 
-    offset = RedisCache.hget("file:#{file.name}", line_number)
+    offset = RedisCache.hget("file:#{file.id}", line_number)
     return { error: "Line number out of range" } unless offset
 
-    cache_key = "line:#{file.name}:#{line_number}"
+    cache_key = "line:#{file.id}:#{line_number}"
     cached_line = RedisCache.get(cache_key)
 
     if cached_line
@@ -82,10 +103,13 @@ class UploadedFileManager
     file = UploadedFile.find_by(id: file_id)
     return { error: "File not found" } unless file
 
-    file_path = STORAGE_PATH.join(file.name)
+    file_extension = File.extname(file.name)
+    unique_filename = "#{file.id}#{file_extension}"
+    file_path = STORAGE_PATH.join(unique_filename)
+
     File.delete(file_path) if File.exist?(file_path)
 
-    RedisCache.hdel("file:#{file.name}")
+    RedisCache.hdel("file:#{file.id}")
     RedisCache.delete("files:list")
 
     file.destroy!
