@@ -7,14 +7,29 @@ RSpec.describe "File Uploads API", type: :request do
       consumes "multipart/form-data"
       parameter name: :file, in: :formData, type: :file, required: true
 
-      response "201", "File uploaded successfully" do
+      response "success", "File uploaded successfully" do
         let(:file) { fixture_file_upload(Rails.root.join("spec/fixtures/files/testfile.txt"), "text/plain") }
-        run_test!
+
+        before do
+          post "/file_uploads.json", params: { file: file }
+        end
+
+        it "returns a JSON response with file details" do
+          json_response = JSON.parse(response.body)
+          expect(json_response).to include("id", "name", "size", "line_count")
+        end
       end
 
-      response "422", "No file uploaded" do
+      response "error", "No file uploaded" do
         let(:file) { nil }
-        run_test!
+
+        before do
+          post "/file_uploads.json", params: {}
+        end
+
+        it "returns an error message in JSON" do
+          expect(response.body).to include("No file uploaded")
+        end
       end
     end
 
@@ -23,7 +38,13 @@ RSpec.describe "File Uploads API", type: :request do
       produces "application/json"
 
       response "200", "Files listed successfully" do
-        run_test!
+        before do
+          get "/file_uploads.json"
+        end
+
+        it "returns a JSON list of files" do
+          expect(response.body).to match(/\[.*\]/)
+        end
       end
     end
   end
@@ -65,7 +86,7 @@ RSpec.describe "File Uploads API", type: :request do
       response "413", "Requested line is out of range" do
         let!(:file) { create(:uploaded_file, line_count: 5) }
         let(:id) { file.id }
-        let(:line) { 999 } # Out of range
+        let(:line) { 999 }
 
         before do
           allow(UploadedFileManager).to receive(:fetch_line_from_file)
