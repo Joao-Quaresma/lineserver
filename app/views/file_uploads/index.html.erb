@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>File Upload Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+  <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+  <%= javascript_importmap_tags %>
+</head>
+<body>
+
+  <%= render "navbar" %>
+
+  <div class="container mt-4">
+    <h1>File Upload Dashboard</h1>
+
+    <% flash.each do |key, message| %>
+      <div class="alert alert-<%= key == 'success' ? 'success' : 'danger' %> alert-dismissible fade show" role="alert">
+        <%= message %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    <% end %>
+
+    <%= render "upload_form" %>
+
+    <h2>Uploaded Files</h2>
+    <%= render "file_list", files: @files %>
+
+    <%= render "view_line_modal" %>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

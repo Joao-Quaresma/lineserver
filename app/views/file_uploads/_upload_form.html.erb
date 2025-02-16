@@ -1,0 +1,43 @@
+<div class="card p-4 mb-4">
+  <h3 class="mb-3">Upload a File</h3>
+  <form id="upload-form" action="/file_uploads" method="POST" enctype="multipart/form-data">
+    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+    <div class="mb-3">
+      <label for="file" class="form-label">Choose a text file (.txt only)</label>
+      <input type="file" name="file" id="file" class="form-control" accept=".txt">
+      <div id="file-error" class="text-danger mt-2 d-none">Only .txt files are allowed.</div>
+    </div>
+    <button type="submit" id="upload-btn" class="btn btn-primary" disabled>Upload</button>
+  </form>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const fileInput = document.getElementById("file");
+    const uploadBtn = document.getElementById("upload-btn");
+    const fileError = document.getElementById("file-error");
+
+    fileInput.addEventListener("change", function() {
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const extension = file.name.split(".").pop().toLowerCase();
+        const allowedExtensions = ["txt"];
+
+        if (!allowedExtensions.includes(extension)) {
+          fileError.classList.remove("d-none");
+          uploadBtn.disabled = true;
+        } else {
+          fileError.classList.add("d-none");
+          uploadBtn.disabled = false;
+        }
+      }
+    });
+
+    document.getElementById("upload-form").addEventListener("submit", function(event) {
+      if (!fileInput.files.length || uploadBtn.disabled) {
+        event.preventDefault();
+        alert("Please select a valid .txt file before uploading.");
+      }
+    });
+  });
+</script>

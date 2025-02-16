@@ -10,14 +10,24 @@ class FileUploadsController < ApplicationController
   #                Returns { error: "No file uploaded" } with status 422 if no file is provided
   def create
     if params[:file].blank?
-      return render json: { error: "No file uploaded" }, status: :unprocessable_entity
+      flash[:error] = "No file uploaded."
+      return redirect_to root_path
+    end
+
+    unless valid_text_file?(params[:file])
+      flash[:error] = "Invalid file type. Only .txt files are allowed."
+      return redirect_to root_path
     end
 
     result = UploadedFileManager.create_uploaded_file(params[:file])
 
-    return render json: { error: result[:error] }, status: :unprocessable_entity if result[:error]
+    if result[:error]
+      flash[:error] = result[:error]
+    else
+      flash[:success] = "File uploaded successfully!"
+    end
 
-    render json: result, status: :created
+    redirect_to root_path
   end
 
   # GET /file_uploads
@@ -25,16 +35,8 @@ class FileUploadsController < ApplicationController
   #
   # @return [JSON] Returns an array of uploaded files (id, name, size, line_count, created_at)
   def index
-    render json: UploadedFileManager.fetch_file_list
+    @files = UploadedFileManager.fetch_file_list.map(&:symbolize_keys)
   end
-  # def index
-  #   @files = UploadedFile.all
-  #   respond_to do |format|
-  #     format.html # Renders app/views/file_uploads/index.html.erb
-  #     format.json { render json: @files }
-  #   end
-  # end
-
 
   # GET /file_uploads/:id?line=:line_number
   # Retrieves a specific line from a file.
@@ -60,5 +62,19 @@ class FileUploadsController < ApplicationController
   def destroy
     result, status = UploadedFileManager.delete_uploaded_file(params[:id])
     render json: result, status: status
+  end
+
+  private
+
+  def valid_text_file?(file)
+    allowed_extension = ".txt"
+    allowed_mime_types = [ "text/plain", "application/octet-stream" ]
+
+    extension = File.extname(file.original_filename).downcase
+    mime_type = Marcel::MimeType.for(file, declared_type: file.content_type)
+
+    Rails.logger.info "Checking file: extension=#{extension}, mime_type=#{mime_type}"
+
+    extension == allowed_extension && allowed_mime_types.include?(mime_type)
   end
 end
