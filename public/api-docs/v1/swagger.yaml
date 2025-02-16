@@ -1,0 +1,58 @@
+---
+openapi: 3.0.1
+info:
+  title: API V1
+  version: v1
+paths:
+  "/file_uploads":
+    post:
+      summary: Upload a file
+      tags:
+      - File Uploads
+      parameters: []
+      responses:
+        '201':
+          description: File uploaded successfully
+        '422':
+          description: No file uploaded
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: file
+        required: true
+    get:
+      summary: List all uploaded files
+      tags:
+      - File Uploads
+      responses:
+        '200':
+          description: Files listed successfully
+  "/file_uploads/{id}/line/{line}":
+    get:
+      summary: Get a specific line from a file
+      tags:
+      - File Uploads
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: line
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Line retrieved successfully
+        '404':
+          description: File not found
+        '413':
+          description: Requested line is out of range
+servers:
+- url: https://{defaultHost}
+  variables:
+    defaultHost:
+      default: www.example.com

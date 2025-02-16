@@ -1,7 +1,9 @@
 class FileStorageService
-  STORAGE_PATH = Rails.root.join("storage", "uploads")
+  STORAGE_PATH = Rails.env.test? ? Rails.root.join("tmp", "test_uploads") : Rails.root.join("storage", "uploads")
 
   def self.save_file(uploaded_file, file_id)
+    ensure_storage_directory
+
     file_extension = File.extname(uploaded_file.original_filename)
     filename = "#{file_id}#{file_extension}"
     file_path = STORAGE_PATH.join(filename)
@@ -44,5 +46,11 @@ class FileStorageService
   def self.delete_file(file_id)
     file_path = get_file_path(file_id)
     File.delete(file_path) if file_path && File.exist?(file_path)
+  end
+
+  private
+
+  def self.ensure_storage_directory
+    FileUtils.mkdir_p(STORAGE_PATH) unless Dir.exist?(STORAGE_PATH)
   end
 end

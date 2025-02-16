@@ -13,17 +13,24 @@ begin
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
+
 RSpec.configure do |config|
   config.fixture_paths = [
     Rails.root.join('spec/fixtures')
   ]
   config.use_transactional_fixtures = true
-
   config.filter_rails_from_backtrace!
-
   config.include FactoryBot::Syntax::Methods
-end
 
+  config.before(:suite) do
+    FileUtils.rm_rf(Rails.root.join("tmp/test_uploads"))
+    FileUtils.mkdir_p(Rails.root.join("tmp/test_uploads"))
+  end
+
+  config.after(:suite) do
+    FileUtils.rm_rf(Rails.root.join("tmp/test_uploads"))
+  end
+end
 Shoulda::Matchers.configure do |config|
   config.integrate do |with|
     with.test_framework :rspec

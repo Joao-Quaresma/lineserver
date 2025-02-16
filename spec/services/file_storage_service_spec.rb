@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe FileStorageService, type: :service do
   let(:file_id) { SecureRandom.uuid }
-  let(:storage_path) { Rails.root.join("storage", "uploads") }
+  let(:storage_path) { Rails.root.join("tmp/test_uploads") }
   let(:file_path) { storage_path.join("#{file_id}.txt") }
   let(:test_file_path) { Rails.root.join("spec/fixtures/files/testfile.txt") }
 
