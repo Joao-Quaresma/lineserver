@@ -164,7 +164,7 @@ This project uses **Bootstrap 5.3.3** for UI styling.
 
 ## 📚 References & Research
 - **Redis Documentation**: https://redis.io/docs/
-- **Rate Limiting Strategies**: https://dev.to/joelbonetr/rate-limiting-strategies-4h80
+- **Rate Limiting Strategies**: https://www.bigbinary.com/blog/rails-8-rate-limiting-api
 - **PostgreSQL Indexing & Optimization**: https://www.postgresql.org/docs/
 - **Rails File Uploads Best Practices**: https://guides.rubyonrails.org/active_storage_overview.html
 
