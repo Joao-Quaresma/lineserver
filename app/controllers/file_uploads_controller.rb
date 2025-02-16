@@ -9,25 +9,25 @@ class FileUploadsController < ApplicationController
   # @return [JSON] Returns file metadata (id, name, size, line_count) on success
   #                Returns { error: "No file uploaded" } with status 422 if no file is provided
   def create
-    if params[:file].blank?
-      flash[:error] = "No file uploaded."
-      return redirect_to root_path
-    end
+    if params[:file].present?
+      result, status = UploadedFileManager.create_uploaded_file(params[:file])
 
-    unless valid_text_file?(params[:file])
-      flash[:error] = "Invalid file type. Only .txt files are allowed."
-      return redirect_to root_path
-    end
-
-    result = UploadedFileManager.create_uploaded_file(params[:file])
-
-    if result[:error]
-      flash[:error] = result[:error]
+      respond_to do |format|
+        format.html do
+          flash[:success] = "File uploaded successfully!"
+          redirect_to root_path
+        end
+        format.json { render json: result, status: status }
+      end
     else
-      flash[:success] = "File uploaded successfully!"
+      respond_to do |format|
+        format.html do
+          flash[:error] = "No file uploaded"
+          redirect_to root_path
+        end
+        format.json { render json: { error: "No file uploaded" }, status: :unprocessable_entity }
+      end
     end
-
-    redirect_to root_path
   end
 
   # GET /file_uploads
@@ -36,6 +36,11 @@ class FileUploadsController < ApplicationController
   # @return [JSON] Returns an array of uploaded files (id, name, size, line_count, created_at)
   def index
     @files = UploadedFileManager.fetch_file_list.map(&:symbolize_keys)
+
+    respond_to do |format|
+      format.html
+      format.json { render json: @files }
+    end
   end
 
   # GET /file_uploads/:id?line=:line_number
