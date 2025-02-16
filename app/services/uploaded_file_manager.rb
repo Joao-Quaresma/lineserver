@@ -14,7 +14,7 @@ class UploadedFileManager
 
     file_record.update!(line_count: file_data[:line_count])
 
-    file_data[:offsets].each { |line_number, offset| RedisCache.hset("file:#{file_record.id}", line_number, offset) }
+    file_data[:offsets].each { |line_number, offset| RedisCache.hset("file:#{file_record.id}", line_number, offset, 3600) }
 
     RedisCache.delete("files:list")
 
@@ -25,7 +25,6 @@ class UploadedFileManager
       line_count: file_record.line_count
     }
   end
-
 
   def self.fetch_file_list
     cached_files = RedisCache.get("files:list")
@@ -45,24 +44,20 @@ class UploadedFileManager
 
     return { error: "File not found on disk" }, :not_found unless FileStorageService.file_exists?(file_id)
 
+    cache_key = "line:#{file.id}:#{line_number}"
+    cached_line = RedisCache.get(cache_key)
+    return [ { id: file.id, line: cached_line }, :ok ] if cached_line
+
     offset = RedisCache.hget("file:#{file.id}", line_number)
     return { error: "Requested line exceeds file length" }, :payload_too_large unless offset
 
-    cache_key = "line:#{file.id}:#{line_number}"
-    cached_line = RedisCache.get(cache_key)
+    file_path = FileStorageService.get_file_path(file_id)
+    selected_line = FileStorageService.read_line(file_path, offset)
 
-    if cached_line
-      selected_line = cached_line
-    else
-      file_path = FileStorageService.get_file_path(file_id)
-      selected_line = FileStorageService.read_line(file_path, offset)
-
-      RedisCache.set(cache_key, selected_line, 300)
-    end
+    RedisCache.set(cache_key, selected_line, 300)
 
     [ { id: file.id, line: selected_line }, :ok ]
   end
-
 
   def self.delete_uploaded_file(file_id)
     file = UploadedFile.find_by(id: file_id)

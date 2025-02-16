@@ -15,8 +15,9 @@ class RedisCache
     REDIS.del(key)
   end
 
-  def self.hset(hash, field, value)
+  def self.hset(hash, field, value, expiration = nil)
     REDIS.hset(hash, field, value)
+    REDIS.expire(hash, expiration) if expiration
   end
 
   def self.hget(hash, field)
@@ -25,5 +26,9 @@ class RedisCache
 
   def self.hdel(hash)
     REDIS.del(hash)
+  end
+
+  def self.hexists(hash)
+    REDIS.exists?(hash)
   end
 end
